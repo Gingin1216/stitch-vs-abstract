@@ -1,7 +1,43 @@
 # 前端（P4）
 
-技术选型二选一：**React + Vite**（推荐，动画生态好）或单文件 `index.html`（最省事）。
-接口契约见根目录 `API.md` §4；联调数据用 `mock/mock_agents.json` 的 `_frontend_full_game_mock`（一局完整时间线，无需等后端）。
+技术栈：React + Vite + TypeScript。
+
+接口契约见根目录 `API.md` §4。默认使用 Mock 数据，不依赖后端；通过
+`VITE_API_MODE=remote` 切换真实接口。
+
+## 本地运行
+
+```bash
+npm install
+npm run dev
+```
+
+默认地址：`http://localhost:5173`
+
+## 校验
+
+```bash
+npm test
+npm run test:e2e
+npm run build
+```
+
+Playwright 默认调用本机 Microsoft Edge，覆盖 1440px 桌面和 375px 手机视口。
+
+## 数据模式
+
+```bash
+# 默认，使用共享 Mock 的隔离适配
+npm run dev
+
+# 真实接口，开发服务器将 /api 代理到 localhost:8001
+$env:VITE_API_MODE="remote"
+npm run dev
+```
+
+如需指定完整 API 地址，可设置 `VITE_API_BASE_URL`。
+
+当前范围只包含开局页和对局页。战报页与 Canvas 海报尚未开发。
 
 ## 页面结构
 
