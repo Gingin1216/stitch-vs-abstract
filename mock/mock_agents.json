@@ -1,5 +1,5 @@
 {
-  "_readme": "P2 给 P1 的写死 mock：MOCK=1 时 Agent 服务直接按 endpoint 返回对应数据。P4 前端也可直连本文件开发。字段以 API.md v1 为准，改字段必须同步改本文件。",
+  "_readme": "P2 给 P1 的写死 mock：MOCK=1 时 Agent 服务直接按 endpoint 返回对应数据。P4 前端也可直连本文件开发。字段以 API.md v1.1 为准（裁判接口含 sentence_after），改字段必须同步改本文件。",
 
   "POST /agents/opening": {
     "sentence": "我今天走进了一家便利店。"
@@ -20,7 +20,8 @@
     "score": 88,
     "comment": "便利店里坐着秦始皇，时空管理局已受理本案。",
     "collapse_delta": 22,
-    "invalid_narrative": false
+    "invalid_narrative": false,
+    "sentence_after": "我今天走进了一家便利店，收银台后坐着秦始皇。"
   },
 
   "POST /agents/judge_stitch": {
@@ -29,7 +30,8 @@
     "surprise": 9,
     "score": 80,
     "comment": "用'统一度量衡的小票'圆回秦始皇收银，典故级缝合。",
-    "collapse_delta": -25
+    "collapse_delta": -25,
+    "sentence_after": "收银台后的秦始皇递给我一张统一度量衡的小票。"
   },
 
   "POST /agents/rewrite": {
