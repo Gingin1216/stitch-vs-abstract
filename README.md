@@ -67,3 +67,6 @@ curl -X POST localhost:8001/api/game -H 'Content-Type: application/json' -d '{"m
 | P2 | agents/ | Prompt 工程、JSON Schema、Tool Calling、看山工作台 |
 | P3 | semantic/ + tests/ | Embedding、余弦相似度、评测集回归 |
 | P4 | frontend/ | React/Vue、动画、Canvas 战报海报、演示视频 |
+
+
+成员P2有一点需要同步给队友的：judge_abstract 请求新增了可选字段 used_words，不传完全不影响（契约未破坏），但 P1 传上来后裁判就能自行查换皮重复词，建议 P1 顺手加上。另外 MOCK 模式下用 httpx 自测时记得 trust_env=False，否则本机代理会劫持 localhost 请求。
