@@ -1,37 +1,35 @@
 {
-  "_readme": "判分评测集（P3 维护，目标 20 组）。每次修改 agents/prompts.py 后运行 python3 run_eval.py 回归，任一样例跌出预期区间即视为判分漂移，必须查明原因。",
+  "_readme": "判分评测集（P3 维护，20 组裁判样例 + 6 组语义层样例）。修改 agents/prompts.py 后运行 python3 run_eval.py 回归裁判；修改 semantic/ 后运行 python3 run_semantic_eval.py 或 test_semantic.py。样例覆盖：日常词/抽象词/违禁词、跳度高/低、近义重复。",
   "judge_abstract": [
-    {
-      "sentence": "我今天走进了一家便利店。",
-      "picked_word": "关东煮", "word_level": 1,
-      "expect": { "score": [0, 30], "collapse_delta": [5, 12] },
-      "why": "场景内普通词，跳度应极低"
-    },
-    {
-      "sentence": "我今天走进了一家便利店。",
-      "picked_word": "秦始皇", "word_level": 3,
-      "expect": { "score": [75, 100], "collapse_delta": [18, 30] },
-      "why": "跨域历史人物，跳度应极高但仍可叙述"
-    },
-    {
-      "sentence": "便利店秦始皇收银，小票统一度量衡。",
-      "picked_word": "找零", "word_level": 1,
-      "expect": { "score": [0, 25], "collapse_delta": [5, 10] },
-      "why": "与收银场景强相关，不应给高分"
-    }
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "关东煮", "word_level": 1, "expect": { "score": [0, 30], "collapse_delta": [5, 12] }, "why": "场景内日常词，跳度极低" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "小票", "word_level": 1, "expect": { "score": [0, 25], "collapse_delta": [5, 10] }, "why": "与便利店强相关的日常词，低跳度" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "找零", "word_level": 1, "expect": { "score": [0, 25], "collapse_delta": [5, 10] }, "why": "收银场景日常词，低跳度" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "量子力学", "word_level": 2, "expect": { "score": [40, 80], "collapse_delta": [14, 24] }, "why": "抽象词，中等以上跳度" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "出轨", "word_level": 2, "expect": { "score": [35, 75], "collapse_delta": [12, 22] }, "why": "抽象词，跳度中高" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "谢邀", "word_level": 2, "expect": { "score": [30, 70], "collapse_delta": [10, 20] }, "why": "知乎梗跨域，中跳度" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "平行宇宙", "word_level": 2, "expect": { "score": [50, 90], "collapse_delta": [15, 26] }, "why": "高抽象词，跳度偏高" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "秦始皇", "word_level": 3, "expect": { "score": [75, 100], "collapse_delta": [18, 30] }, "why": "跨域历史人物，跳度极高但仍可叙述" },
+    { "sentence": "我今天走进了一家便利店。", "picked_word": "黑洞", "word_level": 3, "expect": { "score": [70, 100], "collapse_delta": [16, 30] }, "why": "违禁词，跳度极高" },
+    { "sentence": "兵马俑展厅里游客举起手机。", "picked_word": "秦始皇", "word_level": 3, "expect": { "score": [20, 55], "collapse_delta": [6, 16] }, "why": "词与语境强相关，违禁词也未必高跳度" }
   ],
   "judge_stitch": [
-    {
-      "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。",
-      "picked_word": "小票",
-      "expect": { "logic": [6, 10], "surprise": [5, 10], "collapse_delta": [-30, -15] },
-      "why": "度量衡梗能把逻辑圆回来且妙，应高分低崩坏"
-    },
-    {
-      "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。",
-      "picked_word": "加热",
-      "expect": { "logic": [0, 4], "collapse_delta": [-8, 0] },
-      "why": "'加热'与句子几乎无法产生缝合，应低分"
-    }
+    { "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。", "picked_word": "小票", "expect": { "logic": [6, 10], "surprise": [5, 10], "collapse_delta": [-30, -15] }, "why": "统一度量衡梗能圆回逻辑且妙，高分低崩坏" },
+    { "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。", "picked_word": "加热", "expect": { "logic": [0, 4], "collapse_delta": [-8, 0] }, "why": "与句子几乎无法缝合，低分" },
+    { "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。", "picked_word": "度量衡", "expect": { "logic": [7, 10], "surprise": [6, 10], "collapse_delta": [-30, -18] }, "why": "度量衡呼应秦始皇，典故级缝合" },
+    { "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。", "picked_word": "时空管理局", "expect": { "logic": [6, 10], "surprise": [7, 10], "collapse_delta": [-28, -15] }, "why": "设定流缝合，惊喜度高" },
+    { "sentence_before": "便利店的关东煮在量子隧穿。", "picked_word": "关东煮", "expect": { "logic": [4, 8], "surprise": [4, 9], "collapse_delta": [-20, -8] }, "why": "同源词缝合，中规中矩" },
+    { "sentence_before": "我今天走进了一家便利店。", "picked_word": "找零", "expect": { "logic": [2, 7], "collapse_delta": [-10, 0] }, "why": "平凡补全，缝合度低" },
+    { "sentence_before": "谢邀，人在便利店收银台。", "picked_word": "谢邀", "expect": { "logic": [6, 10], "surprise": [5, 9], "collapse_delta": [-22, -12] }, "why": "知乎梗自洽，趣味缝合" },
+    { "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。", "picked_word": "二维码", "expect": { "logic": [1, 5], "collapse_delta": [-6, 0] }, "why": "现代词难圆，弱缝合" },
+    { "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。", "picked_word": "白矮星", "expect": { "logic": [1, 5], "collapse_delta": [-8, 0] }, "why": "强行天文，弱缝合" },
+    { "sentence_before": "便利店的关东煮在量子隧穿。", "picked_word": "永动机", "expect": { "logic": [4, 9], "surprise": [5, 9], "collapse_delta": [-22, -10] }, "why": "物理梗呼应量子，带哲理感缝合" }
+  ],
+  "semantic": [
+    { "api": "jump", "sentence": "我今天走进了一家便利店。", "word": "便利店", "expect": { "jump_score": [0, 50] }, "why": "词嵌入句子中，相关跳度低" },
+    { "api": "jump", "sentence": "我今天走进了一家便利店。", "word": "秦始皇", "expect": { "jump_score": [60, 100] }, "why": "完全无关词，跳度高" },
+    { "api": "jump", "sentence": "秦始皇", "word": "秦始皇", "expect": { "jump_score": [0, 5] }, "why": "同一字符串，距离为 0" },
+    { "api": "similar", "word": "米线", "history": ["米粉"], "threshold": 0.4, "expect": { "is_duplicate": true }, "why": "近义重复（共享字根「米」），应判重复" },
+    { "api": "similar", "word": "尖叫", "history": ["秦始皇"], "threshold": 0.5, "expect": { "is_duplicate": false }, "why": "无关词，不应判重复" },
+    { "api": "similar", "word": "量子力学", "history": ["量子力学"], "threshold": 0.75, "expect": { "is_duplicate": true }, "why": "与历史完全相同，判重复" }
   ]
 }

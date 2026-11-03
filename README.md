@@ -45,6 +45,7 @@ curl -X POST localhost:8001/api/game -H 'Content-Type: application/json' -d '{"m
 | `LLM_BASE_URL` / `LLM_API_KEY` | 看山工作台对话接口 |
 | `LLM_MODEL` / `LLM_MODEL_STRONG` | 快模型（发牌/压缩）/ 旗舰模型（裁判/解说） |
 | `EMBED_MODEL` | Embedding 模型名 |
+| `EMBED_OFFLINE` | 语义降级开关：默认 `1`（无 Key/异常时降级伪向量），置 `0` 则异常上抛 `AGENT_TIMEOUT` |
 
 ## 目录结构
 
@@ -58,6 +59,21 @@ curl -X POST localhost:8001/api/game -H 'Content-Type: application/json' -d '{"m
 ├── API.md       # 四方接口契约（v1.1 已冻结）
 └── requirements.txt
 ```
+
+## P3 语义层约定（改 embedding 模型 / 断网联调必读）
+
+- **跳度映射公式**：`jump_score` 由 `semantic/embeddings.py` 的 `to_jump()` 计算——余弦距离在 `[CALIB_LO, CALIB_HI]=[0.30, 0.90]` 内线性映射到 0-100，距离 ≤0.30 → 0 分、≥0.90 → 100 分。**更换 embedding 模型后必须重新标定这两个常量**（用几组已知「相关/无关」词对实测）。
+- **离线伪向量兜底**：`embed()` 在无 `LLM_API_KEY` 或接口失败时降级到确定性单字哈希伪向量（`EMBED_OFFLINE=1`，默认）。语义精度有限，仅供 Mock 联调打通链路；无 Key 时端口 8003 可直接秒起。
+- **词库再生成**：`semantic/wordbank.json` 是 `semantic/generate_wordbank.py` 生成的产物，改词库改脚本后重跑，否则会被覆盖：
+  ```bash
+  cd semantic && python3 generate_wordbank.py
+  ```
+- **回归命令**（改 `agents/prompts.py` 或 `semantic/` 后必跑）：
+  ```bash
+  cd tests && python3 test_semantic.py        # P3 纯逻辑单测，离线无前置
+  cd tests && python3 run_semantic_eval.py    # 需先起 semantic:8003
+  cd tests && python3 run_eval.py             # 需先起 agents:8002（真实模式）
+  ```
 
 ## 分工
 
