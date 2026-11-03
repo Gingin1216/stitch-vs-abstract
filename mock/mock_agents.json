@@ -1,0 +1,116 @@
+{
+  "_readme": "P2 给 P1 的写死 mock：MOCK=1 时 Agent 服务直接按 endpoint 返回对应数据。P4 前端也可直连本文件开发。字段以 API.md v1 为准，改字段必须同步改本文件。",
+
+  "POST /agents/opening": {
+    "sentence": "我今天走进了一家便利店。"
+  },
+
+  "POST /agents/deal": {
+    "cards": [
+      { "word": "关东煮", "level": 1, "tag": "日常" },
+      { "word": "小票", "level": 1, "tag": "日常" },
+      { "word": "量子力学", "level": 2, "tag": "抽象" },
+      { "word": "谢邀", "level": 2, "tag": "知乎梗" },
+      { "word": "秦始皇", "level": 3, "tag": "违禁" }
+    ]
+  },
+
+  "POST /agents/judge_abstract": {
+    "jump_score": 92,
+    "score": 88,
+    "comment": "便利店里坐着秦始皇，时空管理局已受理本案。",
+    "collapse_delta": 22,
+    "invalid_narrative": false
+  },
+
+  "POST /agents/judge_stitch": {
+    "logic": 8,
+    "fluency": 7,
+    "surprise": 9,
+    "score": 80,
+    "comment": "用'统一度量衡的小票'圆回秦始皇收银，典故级缝合。",
+    "collapse_delta": -25
+  },
+
+  "POST /agents/rewrite": {
+    "sentence": "便利店秦始皇收银，关东煮在量子隧穿。"
+  },
+
+  "POST /agents/commentary": {
+    "text": "第 1 回合选手 A 打出『秦始皇』，世界线就此收束；选手 B 一张小票强行圆回，可惜第 3 回合的『谢邀』让便利店直接升格为国际机场。最终，世界被抽象毁灭。谢邀，便利店已倒闭。"
+  },
+
+  "POST /semantic/jump": {
+    "distance": 0.83,
+    "jump_score": 92
+  },
+
+  "POST /semantic/similar": {
+    "is_duplicate": true,
+    "closest": "米粉",
+    "similarity": 0.81
+  },
+
+  "_frontend_full_game_mock": {
+    "_note": "P4 专用：一局完整的 5 回合对局时间线，可直接驱动前端联调动画与结算页",
+    "game_id": "g_mock01",
+    "mode": "pvp",
+    "rounds": [
+      {
+        "round": 1, "first": "A",
+        "opening": "我今天走进了一家便利店。",
+        "cards": ["关东煮", "小票", "量子力学", "谢邀", "秦始皇"],
+        "a_pick": { "word": "秦始皇", "score": 88, "comment": "便利店里坐着秦始皇，时空管理局已受理本案。", "collapse_delta": 22 },
+        "sentence_after_a": "我今天走进了一家便利店，收银台后坐着秦始皇。",
+        "b_pick": { "word": "小票", "score": 80, "comment": "用'统一度量衡的小票'圆回秦始皇收银，典故级缝合。", "collapse_delta": -25 },
+        "rewritten": "便利店秦始皇收银，小票统一度量衡。",
+        "collapse": 47
+      },
+      {
+        "round": 2, "first": "B",
+        "cards": ["加热", "饭团", "虫洞", "人在美国", "恐龙"],
+        "a_pick": { "word": "虫洞", "score": 76, "comment": "虫洞开在微波炉旁，加热即穿越。", "collapse_delta": 18 },
+        "b_pick": { "word": "加热", "score": 65, "comment": "虫洞被店员当微波炉用了三十年，勉强合理。", "collapse_delta": -12 },
+        "rewritten": "便利店虫洞微波炉，三秒热完史前饭团。",
+        "collapse": 53
+      },
+      {
+        "round": 3, "first": "A",
+        "cards": ["会员积分", "雨伞", "坍缩", "实名反对", "哥斯拉"],
+        "a_pick": { "word": "坍缩", "score": 81, "comment": "波函数在关东煮上方坍缩，观测者请排队。", "collapse_delta": 20 },
+        "b_pick": { "word": "会员积分", "score": 84, "comment": "坍缩一次积一分，末日也能攒兑换，格局打开。", "collapse_delta": -26 },
+        "rewritten": "坍缩可积会员分，末日兑换关东煮。",
+        "collapse": 47
+      },
+      {
+        "round": 4, "first": "B",
+        "cards": ["塑料袋", "夜班", "平行宇宙", "泻药", "梵高"],
+        "a_pick": { "word": "梵高", "score": 70, "comment": "梵高在值夜班，耳朵放在失物招领处。", "collapse_delta": 16 },
+        "b_pick": { "word": "夜班", "score": 58, "comment": "画家上夜班补贴家用，逻辑通但毫无惊喜。", "collapse_delta": -8 },
+        "rewritten": "梵高值夜班，星空画在收银小票上。",
+        "collapse": 55
+      },
+      {
+        "round": 5, "first": "A",
+        "cards": ["找零", "过期", "奇点", "盐选", "三体人"],
+        "a_pick": { "word": "奇点", "score": 90, "comment": "找零时诞生了奇点，请收好您的宇宙。", "collapse_delta": 26 },
+        "b_pick": { "word": "找零", "score": 72, "comment": "宇宙当零钱找给顾客，数学上成立。", "collapse_delta": -15 },
+        "rewritten": "便利店找零找出一个宇宙。",
+        "collapse": 66
+      }
+    ],
+    "report": {
+      "winner": "A",
+      "verdict": "世界被抽象毁灭",
+      "final_story": "便利店找零找出一个宇宙。",
+      "collapse_curve": [50, 47, 53, 47, 55, 66],
+      "score_a": 405, "score_b": 359,
+      "commentary": "五回合鏖战，选手 A 三度祭出违禁词边缘的宇宙级操作，选手 B 的会员积分堪称全场最佳缝合。最终崩坏度 66，世界被抽象毁灭。谢邀，便利店已倒闭。",
+      "poster": {
+        "title": "崩坏缝合局 · 战报",
+        "mvp_word": "秦始皇",
+        "best_comment": "坍缩一次积一分，末日也能攒兑换，格局打开。"
+      }
+    }
+  }
+}

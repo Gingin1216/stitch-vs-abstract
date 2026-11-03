@@ -1,0 +1,37 @@
+{
+  "_readme": "判分评测集（P3 维护，目标 20 组）。每次修改 agents/prompts.py 后运行 python3 run_eval.py 回归，任一样例跌出预期区间即视为判分漂移，必须查明原因。",
+  "judge_abstract": [
+    {
+      "sentence": "我今天走进了一家便利店。",
+      "picked_word": "关东煮", "word_level": 1,
+      "expect": { "score": [0, 30], "collapse_delta": [5, 12] },
+      "why": "场景内普通词，跳度应极低"
+    },
+    {
+      "sentence": "我今天走进了一家便利店。",
+      "picked_word": "秦始皇", "word_level": 3,
+      "expect": { "score": [75, 100], "collapse_delta": [18, 30] },
+      "why": "跨域历史人物，跳度应极高但仍可叙述"
+    },
+    {
+      "sentence": "便利店秦始皇收银，小票统一度量衡。",
+      "picked_word": "找零", "word_level": 1,
+      "expect": { "score": [0, 25], "collapse_delta": [5, 10] },
+      "why": "与收银场景强相关，不应给高分"
+    }
+  ],
+  "judge_stitch": [
+    {
+      "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。",
+      "picked_word": "小票",
+      "expect": { "logic": [6, 10], "surprise": [5, 10], "collapse_delta": [-30, -15] },
+      "why": "度量衡梗能把逻辑圆回来且妙，应高分低崩坏"
+    },
+    {
+      "sentence_before": "我今天走进了一家便利店，收银台后坐着秦始皇。",
+      "picked_word": "加热",
+      "expect": { "logic": [0, 4], "collapse_delta": [-8, 0] },
+      "why": "'加热'与句子几乎无法产生缝合，应低分"
+    }
+  ]
+}
