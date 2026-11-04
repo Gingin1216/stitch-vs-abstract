@@ -221,8 +221,12 @@ def test_health_reports_agentic_capabilities():
     assert "get_semantic_jump" in body["judge_tools"]
 
 
+# 以下三个路由用例回归的是**真实路径**（chat_json 被 monkeypatch 顶替），
+# 与进程级 MOCK 无关：无论 pytest 是否带 MOCK=1 启动，都强制关掉路由的 MOCK 短路。
+
 def test_judge_abstract_route_uses_tool_jump_score(monkeypatch):
     captured = {}
+    monkeypatch.setattr(main, "MOCK", False)
 
     def fake_chat_json(system, user, **kwargs):
         captured["tools"] = [t["function"]["name"] for t in kwargs["tools"]]
@@ -242,6 +246,7 @@ def test_judge_abstract_route_uses_tool_jump_score(monkeypatch):
 
 
 def test_judge_stitch_route_recomputes_score(monkeypatch):
+    monkeypatch.setattr(main, "MOCK", False)
     monkeypatch.setattr(main, "chat_json", lambda s, u, **kw: kw["normalizer"]({
         "logic": 8, "fluency": 7, "surprise": 9, "comment": "典故级缝合",
         "collapse_delta": -25, "sentence_after": "秦始皇递来统一度量衡的小票。",
@@ -252,6 +257,8 @@ def test_judge_stitch_route_recomputes_score(monkeypatch):
 
 
 def test_agent_error_returns_contract_error_shape(monkeypatch):
+    monkeypatch.setattr(main, "MOCK", False)
+
     def boom(*_a, **_kw):
         raise errors.AgentError(errors.AGENT_TIMEOUT, "裁判 Agent 响应超时")
 

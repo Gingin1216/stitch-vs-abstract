@@ -6,11 +6,15 @@
 """
 from __future__ import annotations
 
+import logging
 import os
+import time
 
 import httpx
 
 from errors import AGENT_TIMEOUT, AgentError
+
+logger = logging.getLogger("agents.tools")  # handler 由 llm.py 在 import 时挂上
 
 SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8003")
 # 工具调用是裁判链路的一环，必须快于契约 §1 的 10s 总预算
@@ -58,12 +62,18 @@ JUDGE_TOOLS = [JUMP_TOOL, OVERLAP_TOOL]
 
 
 def _post(path: str, payload: dict) -> dict:
+    t0 = time.monotonic()
     try:
         r = httpx.post(f"{SEMANTIC_URL}{path}", json=payload,
                        timeout=SEMANTIC_TIMEOUT)
         r.raise_for_status()
-        return r.json()
+        data = r.json()
+        logger.info("semantic ok | %s elapsed=%.2fs", path,
+                    time.monotonic() - t0)
+        return data
     except (httpx.HTTPError, ValueError) as e:
+        logger.warning("semantic fail | %s elapsed=%.2fs err=%s", path,
+                       time.monotonic() - t0, e)
         raise AgentError(AGENT_TIMEOUT, f"语义层 {path} 调用失败: {e}")
 
 

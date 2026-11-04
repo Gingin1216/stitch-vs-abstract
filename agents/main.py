@@ -1,13 +1,14 @@
-"""Agent 服务（P2）。MOCK=1 时返回写死数据（Day1 联调用），否则调看山工作台。
+"""Agent 服务（P2）。MOCK=1 时返回写死数据（Day1 联调用），否则调 Kimi。
 
-每个路由只做三件事：组装 user 消息 → 调 llm.chat_json（带 schema + normalizer）
-→ 按契约 §1 把 AgentError 转成统一错误格式。业务规则写在 prompts.py 与 schemas.py，
-路由层保持薄，方便 P3 的评测集直接打接口回归。
+每个路由只做三件事：组装 user 消息 → 调 llm.chat_json（带 schema + normalizer
++ 角色对应的 max_tokens）→ 按契约 §1 把 AgentError 转成统一错误格式。
+业务规则写在 prompts.py 与 schemas.py，路由层保持薄，方便 P3 的评测集直接打接口回归。
 """
 from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -19,7 +20,9 @@ import prompts
 import schemas
 import tools as tool_defs
 from errors import AgentError
-from llm import JUDGE_TEMPERATURE, TOOL_CALLING_SUPPORTED, chat_json
+from llm import (AGENT_TOTAL_BUDGET, JUDGE_TEMPERATURE, MAX_TOKENS_CREATIVE,
+                 MAX_TOKENS_JUDGE, MAX_TOKENS_REWRITE, TOOL_CALLING_SUPPORTED,
+                 chat_json)
 
 MOCK = os.getenv("MOCK") == "1"
 MOCK_PATH = Path(__file__).parent.parent / "mock" / "mock_agents.json"
@@ -122,6 +125,12 @@ def health():
         # 运行期探测到平台不支持 json_schema 时会自动翻成 false
         "structured_output": llm.STRUCTURED_OUTPUT_SUPPORTED,
         "judge_tools": [t["function"]["name"] for t in tool_defs.JUDGE_TOOLS],
+        # 耗时治理配置：health 一眼核对预算/轮数/max_tokens 是否生效
+        "total_budget": llm.AGENT_TOTAL_BUDGET,
+        "max_rounds": llm.MAX_ROUNDS,
+        "max_tokens": {"judge": llm.MAX_TOKENS_JUDGE,
+                       "creative": llm.MAX_TOKENS_CREATIVE,
+                       "rewrite": llm.MAX_TOKENS_REWRITE},
     }
 
 
@@ -133,6 +142,7 @@ def opening(req: OpeningReq):
                      f"主题：{req.theme}\n随机种子：{req.seed}（不同种子请给不同场景）",
                      schema=schemas.OPENING_SCHEMA,
                      required_keys=("sentence",),
+                     max_tokens=MAX_TOKENS_CREATIVE,
                      normalizer=schemas.normalize_opening)
 
 
@@ -146,6 +156,7 @@ def deal(req: DealReq):
     return chat_json(prompts.DEAL_SYSTEM, user,
                      schema=schemas.DEAL_SCHEMA,
                      required_keys=("cards",),
+                     max_tokens=MAX_TOKENS_CREATIVE,
                      normalizer=lambda d: schemas.normalize_deal(d, req.used_words))
 
 
@@ -168,6 +179,7 @@ def judge_abstract(req: JudgeAReq):
             tools=tool_defs.JUDGE_TOOLS, tool_executor=tool_defs.execute_tool,
             temperature=JUDGE_TEMPERATURE, trace=trace,
             schema=schemas.JUDGE_ABSTRACT_SCHEMA,
+            max_tokens=MAX_TOKENS_JUDGE,
             required_keys=("jump_score", "score", "comment",
                            "collapse_delta", "invalid_narrative",
                            "sentence_after"),
@@ -175,13 +187,18 @@ def judge_abstract(req: JudgeAReq):
                 d, _jump_from_trace(trace)))
         return data
 
-    # 兜底模式：平台不支持 function calling，P2 先取跳度再塞进 prompt
+    # 兜底模式：平台不支持 function calling，P2 先取跳度再塞进 prompt。
+    # prefetch 的 HTTP 耗时同样占用本次调用的总预算，剩余部分交给 chat_json。
+    t0 = time.monotonic()
     jump = tool_defs.prefetch_jump(req.sentence, req.picked_word)
+    left = AGENT_TOTAL_BUDGET - (time.monotonic() - t0)
     user += (f'\n（系统已测定 jump_score={jump["jump_score"]}，'
              "请直接使用，不得修改该值）")
     return chat_json(prompts.JUDGE_ABSTRACT_SYSTEM, user, strong=True,
                      temperature=JUDGE_TEMPERATURE,
                      schema=schemas.JUDGE_ABSTRACT_SCHEMA,
+                     max_tokens=MAX_TOKENS_JUDGE,
+                     total_budget=max(0.5, left),
                      required_keys=("score", "comment", "collapse_delta",
                                     "invalid_narrative", "sentence_after"),
                      normalizer=lambda d: schemas.normalize_judge_abstract(
@@ -211,6 +228,7 @@ def judge_stitch(req: JudgeBReq):
     return chat_json(prompts.JUDGE_STITCH_SYSTEM, user, strong=True,
                      temperature=JUDGE_TEMPERATURE,
                      schema=schemas.JUDGE_STITCH_SCHEMA,
+                     max_tokens=MAX_TOKENS_JUDGE,
                      required_keys=("logic", "fluency", "surprise", "comment",
                                     "collapse_delta", "sentence_after"),
                      normalizer=schemas.normalize_judge_stitch)
@@ -223,6 +241,7 @@ def rewrite(req: RewriteReq):
     return chat_json(prompts.REWRITE_SYSTEM, f"故事：{req.story}",
                      schema=schemas.REWRITE_SCHEMA,
                      required_keys=("sentence",),
+                     max_tokens=MAX_TOKENS_REWRITE,
                      normalizer=schemas.normalize_rewrite)
 
 
@@ -235,4 +254,5 @@ def commentary(req: CommentaryReq):
     return chat_json(prompts.COMMENTARY_SYSTEM, user, strong=True,
                      schema=schemas.COMMENTARY_SCHEMA,
                      required_keys=("text",),
+                     max_tokens=MAX_TOKENS_CREATIVE,
                      normalizer=schemas.normalize_commentary)
