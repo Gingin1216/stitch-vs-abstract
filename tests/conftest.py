@@ -101,7 +101,7 @@ class FakeAgents:
 
     def deal(self, sentence: str, round_: int, used_words: list,
          game_id: str | None = None) -> list:
-    return self._dispatch("deal", sentence=sentence, round_=round_,
+        return self._dispatch("deal", sentence=sentence, round_=round_,
                           used_words=used_words, game_id=game_id)
 
     def judge_abstract(self, sentence: str, word: str, level: int, round_: int) -> dict:
