@@ -34,6 +34,8 @@ describe("GameScreen", () => {
         onDismissJudge={vi.fn()}
         onExit={vi.fn()}
         onPick={vi.fn()}
+        onShowReport={vi.fn()}
+        reportBusy={false}
         snapshot={snapshot}
       />,
     );
@@ -55,6 +57,8 @@ describe("GameScreen", () => {
         onDismissJudge={vi.fn()}
         onExit={vi.fn()}
         onPick={onPick}
+        onShowReport={vi.fn()}
+        reportBusy={false}
         snapshot={snapshot}
       />,
     );
@@ -74,6 +78,8 @@ describe("GameScreen", () => {
         onDismissJudge={vi.fn()}
         onExit={vi.fn()}
         onPick={vi.fn()}
+        onShowReport={vi.fn()}
+        reportBusy={false}
         snapshot={snapshot}
       />,
     );

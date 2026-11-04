@@ -5,6 +5,7 @@ import {
   type CardLevel,
   type GameClient,
   type GameMode,
+  type GameReport,
   type GameSnapshot,
   type PickResult,
   type Role,
@@ -34,6 +35,7 @@ interface SharedMock {
   _frontend_full_game_mock: {
     game_id: string;
     rounds: RecordedRound[];
+    report: GameReport;
   };
 }
 
@@ -140,6 +142,39 @@ export class MockGameClient implements GameClient {
     return cloneSnapshot(this.snapshot());
   }
 
+  async getReport(gameId: string): Promise<GameReport> {
+    if (gameId !== this.gameId) {
+      throw new GameApiError("NOT_FOUND", "对局不存在", 404);
+    }
+    if (this.state !== "FINISHED") {
+      throw new GameApiError("INVALID_STATE", "对局尚未结束", 409);
+    }
+
+    const recorded = sharedMock._frontend_full_game_mock.report;
+    const mvp = [...rounds]
+      .map((round) => round.a_pick)
+      .sort((left, right) => right.score - left.score)[0];
+    const bestStitch = [...rounds]
+      .map((round) => round.b_pick)
+      .sort((left, right) => right.score - left.score)[0];
+
+    return {
+      ...recorded,
+      winner: this.reportWinner,
+      verdict: this.reportVerdict,
+      final_story: this.sentence,
+      collapse_curve: [...this.collapseCurve],
+      score_a: this.scoreA,
+      score_b: this.scoreB,
+      commentary: this.reportCommentary,
+      poster: {
+        ...recorded.poster,
+        mvp_word: mvp?.word ?? "",
+        best_comment: bestStitch?.comment ?? recorded.poster.best_comment,
+      },
+    };
+  }
+
   async pick(gameId: string, role: Role, word: string): Promise<PickResult> {
     if (gameId !== this.gameId) {
       throw new GameApiError("NOT_FOUND", "对局不存在", 404);
@@ -199,6 +234,36 @@ export class MockGameClient implements GameClient {
 
   private get currentFirst(): Role {
     return firstRole(this.round);
+  }
+
+  private get reportWinner(): Role | "DRAW" {
+    if (this.collapse > 70) {
+      return "A";
+    }
+    if (this.collapse < 30) {
+      return "B";
+    }
+    return "DRAW";
+  }
+
+  private get reportVerdict(): string {
+    if (this.reportWinner === "A") {
+      return "世界被抽象毁灭";
+    }
+    if (this.reportWinner === "B") {
+      return "逻辑被强行缝合";
+    }
+    return "半疯状态，平局";
+  }
+
+  private get reportCommentary(): string {
+    const result =
+      this.reportWinner === "A"
+        ? "抽象派成功夺走了解释权，世界规则已经停止工作。"
+        : this.reportWinner === "B"
+          ? "缝合派不断回收失控设定，故事勉强恢复了因果。"
+          : "双方都没能彻底夺走解释权，世界停在半疯状态。";
+    return `五回合交锋，A 方累计 ${this.scoreA} 分，B 方累计 ${this.scoreB} 分。最终崩坏度 ${this.collapse}，${this.reportVerdict}。${result}`;
   }
 
   private cardsForRound(round: number): WordCard[] {

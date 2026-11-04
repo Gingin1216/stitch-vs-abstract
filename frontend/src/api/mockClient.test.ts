@@ -66,4 +66,26 @@ describe("MockGameClient", () => {
     expect(result.score_b).toBeGreaterThan(0);
     expect(result.state).toBe("A_TURN");
   });
+
+  it("creates a final report after all five rounds", async () => {
+    const gameClient = client();
+    let game = await gameClient.createGame("pvp");
+
+    while (game.state !== "FINISHED") {
+      const role = game.state[0] as "A" | "B";
+      const card = role === "A" ? game.cards.at(-1) : game.cards[0];
+      if (!card) {
+        throw new Error("Expected a card before the final round");
+      }
+      game = await gameClient.pick(game.game_id, role, card.word);
+    }
+
+    const report = await gameClient.getReport(game.game_id);
+
+    expect(report.final_story).toBe(game.sentence);
+    expect(report.collapse_curve).toHaveLength(6);
+    expect(report.commentary.length).toBeGreaterThan(0);
+    expect(report.poster.mvp_word.length).toBeGreaterThan(0);
+    expect(report.poster.best_comment.length).toBeGreaterThan(0);
+  });
 });

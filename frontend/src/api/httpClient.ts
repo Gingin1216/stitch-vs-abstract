@@ -2,6 +2,7 @@ import {
   GameApiError,
   type GameClient,
   type GameMode,
+  type GameReport,
   type GameSnapshot,
   type PickResult,
   type Role,
@@ -50,6 +51,12 @@ export class HttpGameClient implements GameClient {
         method: "POST",
         body: JSON.stringify({ role, word }),
       },
+    );
+  }
+
+  getReport(gameId: string): Promise<GameReport> {
+    return this.request<GameReport>(
+      `/game/${encodeURIComponent(gameId)}/report`,
     );
   }
 
