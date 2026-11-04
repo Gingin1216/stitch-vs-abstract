@@ -2,10 +2,8 @@ import {
   ArrowRight,
   Bot,
   Radio,
-  ShieldCheck,
   Sparkles,
   Swords,
-  TriangleAlert,
 } from "lucide-react";
 
 import type { GameMode } from "../api";
@@ -77,18 +75,6 @@ export function HomeScreen({
             <br />
             五个回合后，只剩一种世界线。
           </p>
-
-          <div className="risk-rail" aria-label="词卡风险等级">
-            <span>
-              <ShieldCheck size={16} /> 日常
-            </span>
-            <span>
-              <Sparkles size={16} /> 抽象
-            </span>
-            <span>
-              <TriangleAlert size={16} /> 违禁
-            </span>
-          </div>
         </section>
 
         <section className="mode-picker" aria-labelledby="mode-title">

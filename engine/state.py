@@ -30,6 +30,7 @@ class Game:
     score_b: int = 0
     used_words: list = field(default_factory=list)
     cards: list = field(default_factory=list)
+    spare: list = field(default_factory=list)          # 备用词池：选词后换牌补位
     history: list = field(default_factory=list)          # 每回合完整记录
     collapse_curve: list = field(default_factory=lambda: [COLLAPSE_START])
     commentary: str = ""

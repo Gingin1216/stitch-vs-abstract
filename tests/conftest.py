@@ -62,6 +62,11 @@ class FakeAgents:
             {"word": "谢邀", "level": 2, "tag": "知乎梗"},
             {"word": "秦始皇", "level": 3, "tag": "违禁"},
         ]
+        # 备用词池（level ≥2）：换牌补位用；避免 level 1，不影响 _auto_b 选最小词
+        self.spare_cards = [
+            {"word": "虫洞", "level": 2, "tag": "抽象"},
+            {"word": "熵", "level": 3, "tag": "违禁"},
+        ]
         self.abstract_result = {
             "jump_score": 92, "score": 88, "comment": "便利店里坐着秦始皇。",
             "collapse_delta": 22, "invalid_narrative": False,
@@ -94,9 +99,12 @@ class FakeAgents:
     def opening(self) -> str:
         return self._dispatch("opening")
 
-    def deal(self, sentence: str, round_: int, used_words: list) -> list:
-        return self._dispatch("deal", sentence=sentence, round_=round_,
-                              used_words=used_words)
+    def deal(self, sentence: str, round_: int, used_words: list) -> dict:
+        self.calls.append({"name": "deal", "sentence": sentence,
+                           "round_": round_, "used_words": used_words})
+        if self.mode == "raise":
+            raise self._agent_error("AGENT_TIMEOUT", "fake deal failure")
+        return {"cards": list(self.cards), "spare": list(self.spare_cards)}
 
     def judge_abstract(self, sentence: str, word: str, level: int, round_: int) -> dict:
         return self._dispatch("judge_abstract", sentence=sentence, word=word,

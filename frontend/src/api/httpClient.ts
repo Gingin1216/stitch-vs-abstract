@@ -8,7 +8,9 @@ import {
   type Role,
 } from "./types";
 
-const REQUEST_TIMEOUT_MS = 12_000;
+// 必须大于 ENGINE_TIMEOUT（.env 中为 90s），否则后端成功前前端已 abort。
+// 链路约束：LLM_TIMEOUT(60) < AGENT_TOTAL_BUDGET(70) < ENGINE_TIMEOUT(90) < 此处(95)
+const REQUEST_TIMEOUT_MS = 95_000;
 
 interface ApiErrorBody {
   error?: {

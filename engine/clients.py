@@ -38,7 +38,8 @@ def opening() -> str:
     return _post(AGENTS_URL, "/agents/opening", {"theme": "daily"})["sentence"]
 
 
-def deal(sentence: str, round_: int, used_words: list) -> list:
+def deal(sentence: str, round_: int, used_words: list) -> dict:
+    """返回 {"cards": [...5 张主牌], "spare": [...备用池]}，梯度校验失败重试一次。"""
     data = _post(AGENTS_URL, "/agents/deal", {
         "sentence": sentence, "round": round_,
         "used_words": used_words, "zhihu_flavor": True,
@@ -51,8 +52,7 @@ def deal(sentence: str, round_: int, used_words: list) -> list:
             "sentence": sentence, "round": round_,
             "used_words": used_words, "zhihu_flavor": True,
         })
-        cards = data.get("cards", cards)
-    return cards
+    return data
 
 
 def judge_abstract(sentence: str, word: str, level: int, round_: int) -> dict:
