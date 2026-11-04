@@ -69,6 +69,7 @@ def _start_round(g: Game):
     g._round_buf = {"round": g.round}
     if g.mode == "pve" and g.first == "B":
         _auto_b(g)
+
         g.state = "A_TURN"  # B 先手已自动出完，轮到 A 行动
 
 
@@ -91,6 +92,11 @@ def _apply_pick(g: Game, role: str, word: str) -> dict:
     g.sentence = j.get("sentence_after") or g.sentence
     g.collapse = clamp(g.collapse + int(j.get("collapse_delta", 0)))
     g.used_words.append(word)
+    # 契约 §2.2：已选词离场，避免同一回合内仍显示在对手手牌里；
+    # 从备用词池补一张新词换位（无备用则优雅降级，手牌变少但游戏继续）
+    g.cards = [c for c in g.cards if c["word"] != word]
+    if g.spare:
+        g.cards.append(g.spare.pop(0))
     return j
 
 

@@ -61,10 +61,30 @@ def opening(game_id: str | None = None) -> str:
         return DEFAULT_OPENING
 
 
-def deal(sentence: str, round_: int, used_words: list,
-         game_id: str | None = None) -> list:
-    payload = {"sentence": sentence, "round": round_,
-               "used_words": used_words, "zhihu_flavor": True}
+def deal(sentence: str, round_: int, used_words: list, game_id: str | None = None) -> list:
+    payload = {
+        "sentence": sentence, "round": round_,
+        "used_words": used_words, "zhihu_flavor": True,
+    }
+
+    def _fetch() -> list:
+        r = httpx.post(f"{AGENTS_URL}/agents/deal", json=payload,
+                       timeout=OPENING_DEAL_TIMEOUT)
+        r.raise_for_status()
+        return r.json().get("cards", [])
+
+    try:
+        cards = _fetch()
+        if len(cards) != 5 or sorted(c.get("level", 1) for c in cards) != [1, 1, 2, 2, 3]:
+            cards = _fetch()  # 契约 §2.2：梯度校验失败重试一次
+        if len(cards) != 5 or sorted(c.get("level", 1) for c in cards) != [1, 1, 2, 2, 3]:
+            # 契约 §2.2：重试仍不合格 → 离线词库（默认手牌）补位
+            logger.warning("deal 兜底: 重试后梯度仍不合格 game_id=%s", game_id)
+            return [dict(c) for c in DEFAULT_CARDS]
+        return cards
+    except (httpx.HTTPError, ValueError) as e:
+        logger.warning("deal 兜底: Agent 层调用失败 game_id=%s: %s", game_id, e)
+        return [dict(c) for c in DEFAULT_CARDS]
 
     def _fetch() -> list:
         r = httpx.post(f"{AGENTS_URL}/agents/deal", json=payload,

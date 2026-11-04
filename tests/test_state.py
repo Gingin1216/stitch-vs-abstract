@@ -23,7 +23,7 @@ def test_engine_modules_load_isolated(engine_mods):
 
 def test_fake_agents_normal_and_raise(engine_mods, fake_agents):
     assert fake_agents.opening() == "我今天走进了一家便利店。"
-    assert sorted(c["level"] for c in fake_agents.deal("s", 1, [])) == [1, 1, 2, 2, 3]
+    assert sorted(c["level"] for c in fake_agents.deal("s", 1, [])["cards"]) == [1, 1, 2, 2, 3]
     fake_agents.mode = "raise"
     with pytest.raises(engine_mods.clients.AgentError):
         fake_agents.judge_stitch("s", "w")

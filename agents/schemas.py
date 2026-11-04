@@ -56,6 +56,21 @@ DEAL_SCHEMA = _schema("deal", {
             "additionalProperties": False,
         },
     },
+    "spare": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 4,
+        "items": {
+            "type": "object",
+            "properties": {
+                "word": {"type": "string"},
+                "level": {"type": "integer", "enum": [1, 2, 3]},
+                "tag": {"type": "string", "enum": list(VALID_TAGS)},
+            },
+            "required": ["word", "level", "tag"],
+            "additionalProperties": False,
+        },
+    },
 })
 
 JUDGE_ABSTRACT_SCHEMA = _schema("judge_abstract", {
@@ -121,7 +136,11 @@ def normalize_opening(data: dict) -> dict:
 
 
 def normalize_deal(data: dict, used_words: list | None = None) -> dict:
-    """校验 5 张词卡 + 梯度 [1,1,2,2,3]；只是标签错位则原地修正，缺卡才重试。"""
+    """校验 5 张词卡 + 梯度 [1,1,2,2,3]；只是标签错位则原地修正，缺卡才重试。
+
+    spare：备用词池（与主牌/used_words 去重，梯度不限）。LLM 未给出时容忍为空，
+    引擎侧优雅降级（不补牌）；给出时过滤后原样返回，供选词后换牌补位。
+    """
     require(data, ("cards",))
     raw = data["cards"]
     if not isinstance(raw, list):
@@ -159,7 +178,26 @@ def normalize_deal(data: dict, used_words: list | None = None) -> dict:
     for card in cards:
         if card["tag"] is None or (card["level"] == 3 and card["tag"] != "违禁"):
             card["tag"] = default_tag[card["level"]]
-    return {"cards": cards}
+
+    spare_raw = data.get("spare")
+    spare: list = []
+    if isinstance(spare_raw, list):
+        seen_spare = set(seen)  # 备用不得与主牌/已用词重复
+        for item in spare_raw:
+            if not isinstance(item, dict):
+                continue
+            word = str(item.get("word", "")).strip()
+            if not word or word in seen_spare or word in used:
+                continue
+            seen_spare.add(word)
+            try:
+                level = min(3, max(1, int(item.get("level", 1))))
+            except (TypeError, ValueError):
+                level = 1
+            tag = item.get("tag") if item.get("tag") in VALID_TAGS else None
+            spare.append({"word": word, "level": level,
+                          "tag": tag or default_tag[level]})
+    return {"cards": cards, "spare": spare}
 
 
 def normalize_judge_abstract(data: dict, jump_score: int | None = None) -> dict:
