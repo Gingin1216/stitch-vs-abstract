@@ -6,12 +6,14 @@ import {
   gameClient as defaultGameClient,
   type GameClient,
   type GameMode,
+  type GameReport,
   type GameSnapshot,
   type JudgeResult,
   type Role,
 } from "../api";
 import { GameScreen } from "../screens/GameScreen";
 import { HomeScreen } from "../screens/HomeScreen";
+import { ReportScreen } from "../screens/ReportScreen";
 
 interface AppProps {
   client?: GameClient;
@@ -24,9 +26,11 @@ export interface JudgePresentation extends JudgeResult {
 
 export function App({ client = defaultGameClient }: AppProps) {
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
+  const [report, setReport] = useState<GameReport | null>(null);
   const [gameMode, setGameMode] = useState<GameMode>("pvp");
   const [judge, setJudge] = useState<JudgePresentation | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reportBusy, setReportBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function startGame(mode: GameMode) {
@@ -34,6 +38,7 @@ export function App({ client = defaultGameClient }: AppProps) {
     setError("");
     try {
       setGameMode(mode);
+      setReport(null);
       setSnapshot(await client.createGame(mode));
       setJudge(null);
     } catch (cause) {
@@ -72,6 +77,26 @@ export function App({ client = defaultGameClient }: AppProps) {
     }
   }
 
+  async function showReport(gameId: string) {
+    setJudge(null);
+    setReportBusy(true);
+    setError("");
+    try {
+      setReport(await client.getReport(gameId));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  function resetGame() {
+    setSnapshot(null);
+    setReport(null);
+    setJudge(null);
+    setError("");
+  }
+
   if (!snapshot) {
     return (
       <HomeScreen
@@ -79,6 +104,18 @@ export function App({ client = defaultGameClient }: AppProps) {
         error={error}
         mode={client.mode}
         onStart={startGame}
+      />
+    );
+  }
+
+  if (report) {
+    return (
+      <ReportScreen
+        gameId={snapshot.game_id}
+        gameMode={gameMode}
+        mode={client.mode}
+        onRestart={resetGame}
+        report={report}
       />
     );
   }
@@ -92,12 +129,16 @@ export function App({ client = defaultGameClient }: AppProps) {
       error={error}
       mode={client.mode}
       onPick={pickCard}
-      onDismissJudge={() => setJudge(null)}
-      onExit={() => {
-        setSnapshot(null);
-        setJudge(null);
-        setError("");
+      onDismissJudge={() => {
+        if (snapshot.state === "FINISHED") {
+          void showReport(snapshot.game_id);
+        } else {
+          setJudge(null);
+        }
       }}
+      onExit={resetGame}
+      onShowReport={() => void showReport(snapshot.game_id)}
+      reportBusy={reportBusy}
     />
   );
 }

@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   Bot,
   Clock3,
   LogOut,
@@ -27,6 +28,8 @@ interface GameScreenProps {
   onPick: (role: Role, word: string) => void;
   onDismissJudge: () => void;
   onExit: () => void;
+  onShowReport: () => void;
+  reportBusy: boolean;
 }
 
 function roleLabel(role: Role | null): string {
@@ -59,6 +62,8 @@ export function GameScreen({
   onPick,
   onDismissJudge,
   onExit,
+  onShowReport,
+  reportBusy,
 }: GameScreenProps) {
   const currentRole = expectedRole(snapshot);
   const isFinished = snapshot.state === "FINISHED" || !currentRole;
@@ -170,9 +175,14 @@ export function GameScreen({
             <span className="section-code">WORLD LINE SEALED</span>
             <h2 id="finished-title">五回合完成</h2>
             <p>最终崩坏度 {snapshot.collapse}，故事已封存。</p>
-            <button className="primary-button" onClick={onExit} type="button">
-              <RotateCcw size={18} />
-              返回开局
+            <button
+              className="primary-button"
+              disabled={reportBusy}
+              onClick={onShowReport}
+              type="button"
+            >
+              {reportBusy ? "战报生成中..." : "查看终局战报"}
+              <ArrowRight size={18} />
             </button>
           </section>
         ) : (

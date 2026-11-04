@@ -44,11 +44,27 @@ export interface PickResult extends GameSnapshot {
   judge: JudgeResult;
 }
 
+export interface GameReport {
+  winner: Role | "DRAW";
+  verdict: string;
+  final_story: string;
+  collapse_curve: number[];
+  score_a: number;
+  score_b: number;
+  commentary: string;
+  poster: {
+    title: string;
+    mvp_word: string;
+    best_comment: string;
+  };
+}
+
 export interface GameClient {
   readonly mode: "mock" | "remote";
   createGame(mode: GameMode): Promise<GameSnapshot>;
   getGame(gameId: string): Promise<GameSnapshot>;
   pick(gameId: string, role: Role, word: string): Promise<PickResult>;
+  getReport(gameId: string): Promise<GameReport>;
 }
 
 export class GameApiError extends Error {
