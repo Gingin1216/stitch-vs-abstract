@@ -8,7 +8,7 @@ import httpx
 
 AGENTS_URL = os.getenv("AGENTS_URL", "http://localhost:8002")
 SEMANTIC_URL = os.getenv("SEMANTIC_URL", "http://localhost:8003")
-TIMEOUT = httpx.Timeout(12.0, connect=5.0)
+TIMEOUT = httpx.Timeout(float(os.getenv("ENGINE_TIMEOUT", "12")), connect=5.0)
 
 FALLBACK_COMMENTS = [
     "裁判被这波操作震撼到说不出话。",
