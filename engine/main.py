@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 import clients
@@ -9,6 +10,15 @@ from state import Game, TOTAL_ROUNDS, TURN_STATES, clamp
 
 app = FastAPI(title="崩坏缝合局 · 游戏引擎")
 GAMES: dict[str, Game] = {}
+
+
+@app.exception_handler(HTTPException)
+def http_error_handler(_request, exc: HTTPException):
+    """契约 §1 统一错误格式：err() 的 detail 即 {"error": {...}}，原样作为响应体；
+    非 dict detail（如框架默认 404）保持 {"detail": ...} 包装。"""
+    if isinstance(exc.detail, dict):
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 class CreateReq(BaseModel):
@@ -37,6 +47,7 @@ def _start_round(g: Game):
     g._round_buf = {"round": g.round}
     if g.mode == "pve" and g.first == "B":
         _auto_b(g)
+        g.state = "A_TURN"  # B 先手已自动出完，轮到 A 行动
 
 
 def _auto_b(g: Game):

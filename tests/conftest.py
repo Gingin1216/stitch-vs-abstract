@@ -74,6 +74,9 @@ class FakeAgents:
             "sentence_after": "收银台后的秦始皇递给我一张统一度量衡的小票。",
         }
         self.rewrite_sentence = "便利店秦始皇收银，关东煮在量子隧穿。"
+        self.commentary_text = ("五回合鏖战，选手 A 三度祭出违禁词边缘的宇宙级操作，"
+                                "选手 B 的会员积分堪称全场最佳缝合。谢邀，便利店已倒闭。")
+        self.is_duplicate_result = False  # P3 近义判定的可控开关，测试里按需改写
 
     def _dispatch(self, name: str, **kwargs):
         self.calls.append({"name": name, **kwargs})
@@ -82,7 +85,8 @@ class FakeAgents:
         attr = {"opening": "opening_sentence", "deal": "cards",
                 "judge_abstract": "abstract_result",
                 "judge_stitch": "stitch_result",
-                "rewrite": "rewrite_sentence"}[name]
+                "rewrite": "rewrite_sentence",
+                "commentary": "commentary_text"}[name]
         return getattr(self, attr)
 
     # 以下签名与 clients.py 保持一致
@@ -105,15 +109,28 @@ class FakeAgents:
     def rewrite(self, story: str) -> str:
         return self._dispatch("rewrite", story=story)
 
+    def commentary(self, rounds: list, winner: str, final_story: str) -> str:
+        return self._dispatch("commentary", rounds=rounds, winner=winner,
+                              final_story=final_story)
+
+    def is_duplicate(self, word: str, history: list, threshold: float = 0.75) -> bool:
+        # 不走 _dispatch：它模拟 P3 的判定结果而非网络故障，mode="raise" 不影响
+        self.calls.append({"name": "is_duplicate", "word": word,
+                           "history": history, "threshold": threshold})
+        return self.is_duplicate_result
+
 
 @pytest.fixture
 def fake_agents(engine_mods, monkeypatch):
     """把隔离加载的 engine clients 的 opening/deal/judge_abstract/
-    judge_stitch/rewrite 换成 FakeAgents 实现，返回假客户端供控制与断言。"""
+    judge_stitch/rewrite/commentary/is_duplicate 全部换成 FakeAgents 实现，
+    返回假客户端供控制与断言（不留任何真实 HTTP 调用）。"""
     fake = FakeAgents(engine_mods.clients)
     monkeypatch.setattr(engine_mods.clients, "opening", fake.opening)
     monkeypatch.setattr(engine_mods.clients, "deal", fake.deal)
     monkeypatch.setattr(engine_mods.clients, "judge_abstract", fake.judge_abstract)
     monkeypatch.setattr(engine_mods.clients, "judge_stitch", fake.judge_stitch)
     monkeypatch.setattr(engine_mods.clients, "rewrite", fake.rewrite)
+    monkeypatch.setattr(engine_mods.clients, "commentary", fake.commentary)
+    monkeypatch.setattr(engine_mods.clients, "is_duplicate", fake.is_duplicate)
     return fake
