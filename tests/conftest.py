@@ -1,29 +1,56 @@
-"""P1 引擎测试夹具：Fake Agent 替换 engine/clients.py 的外部调用。
+"""P1 引擎测试夹具：隔离加载 engine 模块 + Fake Agent 替换外部调用。
 
-全程禁止真实网络请求；返回值写死、可在测试里改写，
+engine/ 是平铺导入（main.py 里 `import clients` / `from state import ...`），
+与 agents/ 的 main.py 等共用 sys.modules 的通用键，同一会话必须隔离加载。
+全程禁止真实网络请求；FakeAgents 返回值写死、可在测试里改写，
 mode 可在 "normal"（正常返回）/ "raise"（抛 AgentError）间切换。
 """
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
 
-import clients  # noqa: E402
+def load_engine_modules(monkeypatch) -> SimpleNamespace:
+    """隔离加载 engine 的 state/clients/main，返回 SimpleNamespace(state=, clients=, main=)。
+
+    加载前把 engine/ 顶到 sys.path 最前，按依赖顺序加载，保证拿到 engine 自己的
+    版本；加载后立即从 sys.modules 删掉 state/clients/main 这些通用名——否则
+    通用名常驻会与 agents/ 的同名模块互相覆盖（两边都有 main.py），后续任何
+    import 同名模块的代码都会串味；原值由 monkeypatch 在测试结束时还原。
+    """
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parent.parent / "engine"))
+    mods = {}
+    for name in ("state", "clients", "main"):  # 依赖顺序：state ← clients ← main
+        monkeypatch.delitem(sys.modules, name, raising=False)
+        # 加载期间保留在 sys.modules，main.py 的 import clients 才会命中 engine 版本
+        mods[name] = importlib.import_module(name)
+    for name in mods:
+        # 用完即摘：通用名不留存，agents/ 的同名模块对后续 import 不可见、也不被覆盖
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    return SimpleNamespace(**mods)
+
+
+@pytest.fixture
+def engine_mods(monkeypatch):
+    """每个测试单独加载一套 engine 模块（含全新的 FastAPI app 与 GAMES 表）。"""
+    return load_engine_modules(monkeypatch)
 
 
 class FakeAgents:
     """假 Agent 客户端：签名与 clients.py 一致，返回写死的合法值。
 
     - mode = "normal"：返回写死值（默认合法，可直接跑完整对局）
-    - mode = "raise" ：抛 clients.AgentError，模拟 Agent 挂掉
+    - mode = "raise" ：抛 engine 隔离模块的 AgentError，模拟 Agent 挂掉
     - calls 记录每次调用的名字与入参，供断言
     """
 
-    def __init__(self) -> None:
+    def __init__(self, clients_module) -> None:
+        self._agent_error = clients_module.AgentError
         self.mode = "normal"
         self.calls: list[dict] = []
         # 写死返回值（与契约 §2 示例对齐）
@@ -51,7 +78,7 @@ class FakeAgents:
     def _dispatch(self, name: str, **kwargs):
         self.calls.append({"name": name, **kwargs})
         if self.mode == "raise":
-            raise clients.AgentError("AGENT_TIMEOUT", f"fake {name} failure")
+            raise self._agent_error("AGENT_TIMEOUT", f"fake {name} failure")
         attr = {"opening": "opening_sentence", "deal": "cards",
                 "judge_abstract": "abstract_result",
                 "judge_stitch": "stitch_result",
@@ -80,13 +107,13 @@ class FakeAgents:
 
 
 @pytest.fixture
-def fake_agents(monkeypatch):
-    """把 clients 的 opening/deal/judge_abstract/judge_stitch/rewrite
-    换成 FakeAgents 的实现，返回该假客户端供测试控制与断言。"""
-    fake = FakeAgents()
-    monkeypatch.setattr(clients, "opening", fake.opening)
-    monkeypatch.setattr(clients, "deal", fake.deal)
-    monkeypatch.setattr(clients, "judge_abstract", fake.judge_abstract)
-    monkeypatch.setattr(clients, "judge_stitch", fake.judge_stitch)
-    monkeypatch.setattr(clients, "rewrite", fake.rewrite)
+def fake_agents(engine_mods, monkeypatch):
+    """把隔离加载的 engine clients 的 opening/deal/judge_abstract/
+    judge_stitch/rewrite 换成 FakeAgents 实现，返回假客户端供控制与断言。"""
+    fake = FakeAgents(engine_mods.clients)
+    monkeypatch.setattr(engine_mods.clients, "opening", fake.opening)
+    monkeypatch.setattr(engine_mods.clients, "deal", fake.deal)
+    monkeypatch.setattr(engine_mods.clients, "judge_abstract", fake.judge_abstract)
+    monkeypatch.setattr(engine_mods.clients, "judge_stitch", fake.judge_stitch)
+    monkeypatch.setattr(engine_mods.clients, "rewrite", fake.rewrite)
     return fake
