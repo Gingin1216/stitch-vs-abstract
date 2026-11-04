@@ -213,3 +213,63 @@ def test_pve_auto_b_picks_lowest_level(client, fake_agents):
     # 词卡固定，level 最小的是第一张"关东煮"，B 五回合都由 AI 自动出它
     assert all(h["b_word"] == "关东煮" for h in snap["history"])
     assert all(h["a_word"] == B_WORD for h in snap["history"])
+
+
+# ---------- 统一错误格式测试（契约 §1 + v1.2 变更记录） ----------
+
+def test_game_id_not_found_returns_404(client):
+    """game_id 不存在 → 404 + 统一错误结构。"""
+    r = client.get("/api/game/g_nope")
+    assert r.status_code == 404
+    assert r.json() == {"error": {"code": "NOT_FOUND",
+                                  "message": "对局不存在", "retryable": False}}
+    r = client.post("/api/game/g_nope/pick", json={"role": "A", "word": "x"})
+    assert r.status_code == 404
+    assert r.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_wrong_phase_action_returns_409(client, fake_agents):
+    """当前阶段不接受该动作（A_TURN 时 B 出词）→ 409 + INVALID_STATE，结构与改动前一致。"""
+    game_id = create_game(client)
+    r = client.post(f"/api/game/{game_id}/pick", json={"role": "B", "word": B_WORD})
+    assert r.status_code == 409
+    assert r.json() == {"error": {"code": "INVALID_STATE",
+                                  "message": "当前状态 A_TURN 不允许 B 选词",
+                                  "retryable": False}}
+
+
+def test_word_not_in_hand_returns_400(client, fake_agents):
+    """出的词不在当前手牌 → 400 + CARD_NOT_IN_HAND（契约 v1.2 新增错误码）。"""
+    game_id = create_game(client)
+    r = client.post(f"/api/game/{game_id}/pick",
+                    json={"role": "A", "word": "不存在的词"})
+    assert r.status_code == 400
+    assert r.json() == {"error": {"code": "CARD_NOT_IN_HAND",
+                                  "message": "所出的词不在当前手牌中",
+                                  "retryable": False}}
+
+
+def test_bad_request_body_returns_400(client):
+    """请求体缺字段 → 400 + BAD_REQUEST（原 FastAPI 默认 422 {"detail": ...} 收编）。"""
+    r = client.post("/api/game/g_any/pick", json={"role": "A"})  # 缺 word
+    assert r.status_code == 400
+    body = r.json()
+    assert body["error"]["code"] == "BAD_REQUEST"
+    assert body["error"]["retryable"] is False
+
+
+def test_uncaught_exception_returns_500(engine_mods, monkeypatch):
+    """未捕获异常 → 500 + INTERNAL_ERROR 统一结构（全局 handler，不改变 err() 路径）。
+
+    Starlette 的 ServerErrorMiddleware 处理完 base Exception 后会原样再上抛一次
+    （供服务端日志记录），TestClient 默认 raise_server_exceptions=True 会把这次
+    上抛带进测试——故此处显式关掉，只断言已发出的 500 响应体。
+    """
+    def boom():
+        raise RuntimeError("boom")
+    monkeypatch.setattr(engine_mods.clients, "opening", boom)
+    c = TestClient(engine_mods.main.app, raise_server_exceptions=False)
+    r = c.post("/api/game", json={"mode": "pvp"})
+    assert r.status_code == 500
+    assert r.json() == {"error": {"code": "INTERNAL_ERROR",
+                                  "message": "服务器内部错误", "retryable": False}}

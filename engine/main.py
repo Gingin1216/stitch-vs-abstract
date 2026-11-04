@@ -1,7 +1,10 @@
 """游戏引擎 API（P1）。对前端暴露契约 §4 的接口。"""
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -10,6 +13,7 @@ from state import Game, TOTAL_ROUNDS, TURN_STATES, clamp
 
 app = FastAPI(title="崩坏缝合局 · 游戏引擎")
 GAMES: dict[str, Game] = {}
+logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(HTTPException)
@@ -19,6 +23,24 @@ def http_error_handler(_request, exc: HTTPException):
     if isinstance(exc.detail, dict):
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error_handler(_request, exc: RequestValidationError):
+    """请求体缺字段/类型错 → 400 + 统一错误结构（收编 FastAPI 默认 422 {"detail": ...}）。"""
+    msg = exc.errors()[0]["msg"] if exc.errors() else "请求参数不合法"
+    return JSONResponse(status_code=400, content={
+        "error": {"code": "BAD_REQUEST", "message": f"请求参数不合法: {msg}",
+                  "retryable": False}})
+
+
+@app.exception_handler(Exception)
+def unhandled_error_handler(_request, exc: Exception):
+    """未捕获异常 → 500 + 统一错误结构；traceback 只进服务端日志，不外泄细节。"""
+    logger.exception("未捕获异常: %s", exc)
+    return JSONResponse(status_code=500, content={
+        "error": {"code": "INTERNAL_ERROR", "message": "服务器内部错误",
+                  "retryable": False}})
 
 
 class CreateReq(BaseModel):
@@ -104,7 +126,7 @@ def pick(game_id: str, req: PickReq):
     if g.state not in TURN_STATES or req.role != g.expected_role:
         err("INVALID_STATE", f"当前状态 {g.state} 不允许 {req.role} 选词")
     if req.word not in [c["word"] for c in g.cards]:
-        err("INVALID_STATE", "所选词不在本回合词卡中")
+        err("CARD_NOT_IN_HAND", "所出的词不在当前手牌中", 400)
     if clients.is_duplicate(req.word, g.used_words):
         err("WORD_DUPLICATE", "该词与历史选词重复或近义，请换一张")
 
