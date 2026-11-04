@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 import clients
-from state import Game, TOTAL_ROUNDS, TURN_STATES, clamp
+from state import Game, TOTAL_ROUNDS, TURN_STATES, clamp, sweep
 
 app = FastAPI(title="崩坏缝合局 · 游戏引擎")
 GAMES: dict[str, Game] = {}
@@ -64,7 +64,7 @@ def _get(game_id: str) -> Game:
 
 
 def _start_round(g: Game):
-    g.cards = clients.deal(g.sentence, g.round, g.used_words)
+    g.cards = clients.deal(g.sentence, g.round, g.used_words, game_id=g.id)
     g.state = f"{g.first}_TURN"
     g._round_buf = {"round": g.round}
     if g.mode == "pve" and g.first == "B":
@@ -108,8 +108,9 @@ def _end_round(g: Game):
 
 @app.post("/api/game")
 def create_game(req: CreateReq):
+    sweep(GAMES)
     g = Game(mode=req.mode)
-    g.sentence = clients.opening()
+    g.sentence = clients.opening(game_id=g.id)
     GAMES[g.id] = g
     _start_round(g)
     return g.snapshot()
@@ -117,11 +118,13 @@ def create_game(req: CreateReq):
 
 @app.get("/api/game/{game_id}")
 def get_game(game_id: str):
+    sweep(GAMES)
     return _get(game_id).snapshot()
 
 
 @app.post("/api/game/{game_id}/pick")
 def pick(game_id: str, req: PickReq):
+    sweep(GAMES)
     g = _get(game_id)
     if g.state not in TURN_STATES or req.role != g.expected_role:
         err("INVALID_STATE", f"当前状态 {g.state} 不允许 {req.role} 选词")
@@ -150,6 +153,7 @@ def pick(game_id: str, req: PickReq):
 
 @app.get("/api/game/{game_id}/report")
 def report(game_id: str):
+    sweep(GAMES)
     g = _get(game_id)
     if g.state != "FINISHED":
         err("INVALID_STATE", "对局尚未结束")

@@ -91,12 +91,13 @@ class FakeAgents:
 
     # 以下签名与 clients.py 保持一致
 
-    def opening(self) -> str:
-        return self._dispatch("opening")
+    def opening(self, game_id: str | None = None) -> str:
+        return self._dispatch("opening", game_id=game_id)
 
-    def deal(self, sentence: str, round_: int, used_words: list) -> list:
+    def deal(self, sentence: str, round_: int, used_words: list,
+             game_id: str | None = None) -> list:
         return self._dispatch("deal", sentence=sentence, round_=round_,
-                              used_words=used_words)
+                              used_words=used_words, game_id=game_id)
 
     def judge_abstract(self, sentence: str, word: str, level: int, round_: int) -> dict:
         return self._dispatch("judge_abstract", sentence=sentence, word=word,

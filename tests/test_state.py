@@ -3,8 +3,10 @@
 函数级 fake（conftest.fake_agents）驱动状态机行为；
 HTTP 层 fake（monkeypatch _post）驱动真 clients 的公式复核与宕机兜底。
 """
+import logging
 import sys
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -273,3 +275,89 @@ def test_uncaught_exception_returns_500(engine_mods, monkeypatch):
     assert r.status_code == 500
     assert r.json() == {"error": {"code": "INTERNAL_ERROR",
                                   "message": "服务器内部错误", "retryable": False}}
+
+
+# ---------- opening/deal 兜底（契约 §1：任何 Agent 挂了游戏必须能继续） ----------
+
+def test_opening_deal_fallback_returns_defaults(engine_mods, monkeypatch, caplog):
+    """fake client（HTTP 层）抛异常：opening 返回默认开局句，deal 返回默认手牌。
+
+    默认手牌必须满足契约 §2.2 结构约束：2 普通 + 2 抽象 + 1 违禁。
+    """
+    # 签名对齐真实 httpx.post（url 单 positional、其余 keyword-only）：
+    # 生产代码若再传两个 positional，这里直接 TypeError 暴露，而不是被假桩吃掉
+    def boom(url, *, json=None, timeout=None, **_kw):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(engine_mods.clients.httpx, "post", boom)
+
+    with caplog.at_level(logging.WARNING):
+        assert engine_mods.clients.opening(game_id="g_x") == "我今天走进了一家便利店。"
+        cards = engine_mods.clients.deal("s", 1, [], game_id="g_x")
+
+    levels = sorted(c["level"] for c in cards)
+    assert levels == [1, 1, 2, 2, 3]
+    assert [c["tag"] for c in cards] == ["日常", "日常", "抽象", "知乎梗", "违禁"]
+    # warning 日志带 game_id，且 opening/deal 各记一条
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 2
+    assert all("g_x" in r.getMessage() for r in warnings)
+
+    # 返回的是拷贝：篡改返回值不得污染常量
+    cards[0]["word"] = "被篡改"
+    assert engine_mods.clients.deal("s", 1, [])[0]["word"] == "关东煮"
+
+
+def test_opening_deal_fallback_at_api_level(engine_mods, monkeypatch):
+    """API 层：Agent 层全挂时建局仍成功（默认句 + 默认手牌），首回合可出牌。"""
+    # 签名对齐真实 httpx.post（url 单 positional、其余 keyword-only）：
+    # 生产代码若再传两个 positional，这里直接 TypeError 暴露，而不是被假桩吃掉
+    def boom(url, *, json=None, timeout=None, **_kw):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(engine_mods.clients.httpx, "post", boom)
+    c = TestClient(engine_mods.main.app)
+
+    r = c.post("/api/game", json={"mode": "pvp"})
+    assert r.status_code == 200, r.text
+    snap = r.json()
+    assert snap["sentence"] == "我今天走进了一家便利店。"
+    assert sorted(card["level"] for card in snap["cards"]) == [1, 1, 2, 2, 3]
+
+    r = c.post(f"/api/game/{snap['game_id']}/pick",
+               json={"role": "A", "word": "秦始皇"})
+    assert r.status_code == 200, r.text
+    assert r.json()["judge"]["score"] == 50  # 裁判兜底分，对局未被建局失败挡住
+
+
+# ---------- 会话清理（惰性扫描：每次请求时删除超 TTL 的对局） ----------
+
+def test_expired_games_cleaned_on_next_request(client, fake_agents, engine_mods):
+    """活跃对局闲置超 ENGINE_GAME_TTL（默认 30 分钟）→ 下次请求时被清理。"""
+    fresh_id = create_game(client)
+    stale_id = create_game(client)
+    games = engine_mods.main.GAMES
+    games[stale_id].last_active_at -= 31 * 60  # 手工构造过期局
+
+    assert client.get(f"/api/game/{fresh_id}").status_code == 200  # 触发扫描
+    assert stale_id not in games
+    r = client.get(f"/api/game/{stale_id}")
+    assert r.status_code == 404
+    assert r.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_finished_game_kept_15_minutes(client, fake_agents, engine_mods):
+    """FINISHED 局单独保留 15 分钟供前端拉战报，超时后随扫描删除。"""
+    game_id = create_game(client)
+    for first in ["A", "B", "A", "B", "A"]:
+        play_round(client, game_id, first=first)
+    games = engine_mods.main.GAMES
+    assert games[game_id].state == "FINISHED"
+
+    games[game_id].last_active_at -= 10 * 60  # 10 分钟 < 15 分钟
+    assert client.get(f"/api/game/{game_id}/report").status_code == 200
+
+    games[game_id].last_active_at -= 20 * 60  # 上次请求已刷新，累计 20 分钟 > 15 分钟
+    r = client.get(f"/api/game/{game_id}/report")
+    assert r.status_code == 404
+    assert game_id not in games
